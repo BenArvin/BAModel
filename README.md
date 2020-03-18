@@ -2,7 +2,7 @@
 
 TODO:
 
-- [ ] support ignored property name
+- [X] support ignored property name
 - [ ] support cache
 - [ ] support default value
-- [ ] support specical object class
+- [x] support specical object class

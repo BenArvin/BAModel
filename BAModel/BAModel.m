@@ -271,15 +271,22 @@
     }
     
     NSMutableDictionary *propertyInfos = [[NSMutableDictionary alloc] init];
-    unsigned int propertyCount;
-    objc_property_t *propertyList = class_copyPropertyList([self class], &propertyCount);
-    for (int i=0; i<propertyCount; i++) {
-        objc_property_t propertyItem = propertyList[i];
-        NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
-        NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:property_getAttributes(propertyItem)];
-        if (propertyNameString && propertyClassString) {
-            [propertyInfos setObject:propertyClassString forKey:propertyNameString];
+    Class currentClass = [self class];
+    while (1) {
+        if (currentClass == [BAModel class]) {
+            break;
         }
+        unsigned int propertyCount;
+        objc_property_t *propertyList = class_copyPropertyList(currentClass, &propertyCount);
+        for (int i=0; i<propertyCount; i++) {
+            objc_property_t propertyItem = propertyList[i];
+            NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
+            NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:property_getAttributes(propertyItem)];
+            if (propertyNameString && propertyClassString) {
+                [propertyInfos setObject:propertyClassString forKey:propertyNameString];
+            }
+        }
+        currentClass = [currentClass superclass];
     }
     
     NSArray *ignoredProperties = [self ignoredProperties];
@@ -499,50 +506,59 @@
             [result setObject:value forKey:key];
         };
         NSArray *ignoredProperties = [self ignoredProperties];
-        unsigned int propertyCount;
-        objc_property_t *propertyList = class_copyPropertyList([object class], &propertyCount);
-        for (int i=0; i<propertyCount; i++) {
-            objc_property_t propertyItem = propertyList[i];
-            NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
-            if ([ignoredProperties containsObject:propertyNameString]) {
-                continue;
+        Class currentClass = [object class];
+        while (1) {
+            if (currentClass == [BAModel class]) {
+                break;
             }
-            NSString *keyString = [self keyFromPropertyName:propertyNameString];
-            if (!keyString || keyString.length == 0) {
-                continue;
-            }
-            NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:property_getAttributes(propertyItem)];
-            if (!propertyClassString || propertyClassString.length == 0) {
-                continue;
-            }
-            id propertyValue = [object valueForKey:propertyNameString];
-            if ([BAModelHelper isObjectClass:propertyClassString]) {
-                setDicObjectBlock([self codeObject:propertyValue], keyString);
-            } else {
-                if ([propertyClassString isEqualToString:[BAModelHelper boolClassStr]]
-                    || [propertyClassString isEqualToString:[BAModelHelper intClassStr]]
-                    || [propertyClassString isEqualToString:[BAModelHelper unsignedIntClassStr]]
-                    || [propertyClassString isEqualToString:[BAModelHelper NSIntegerClassStr]]
-                    || [propertyClassString isEqualToString:[BAModelHelper NSUIntegerClassStr]]) {
-                    setDicObjectBlock(propertyValue, keyString);
-                } else if ([propertyClassString isEqualToString:[BAModelHelper floatClassStr]]) {
-                    setDicObjectBlock([NSString stringWithFormat:@"%.6f", ((NSNumber *)propertyValue).floatValue], keyString);
-                }  else if ([propertyClassString isEqualToString:[BAModelHelper doubleClassStr]]) {
-                    setDicObjectBlock([NSString stringWithFormat:@"%.14f", ((NSNumber *)propertyValue).doubleValue], keyString);
-                } else if ([propertyClassString isEqualToString:[BAModelHelper rectClassStr]]) {
-                    CGRect rectValue = [(NSValue *)propertyValue CGRectValue];
-                    setDicObjectBlock(NSStringFromCGRect(rectValue), keyString);
-                } else if ([propertyClassString isEqualToString:[BAModelHelper pointClassStr]]) {
-                    CGPoint pointValue = [(NSValue *)propertyValue CGPointValue];
-                    setDicObjectBlock(NSStringFromCGPoint(pointValue), keyString);
-                } else if ([propertyClassString isEqualToString:[BAModelHelper sizeClassStr]]) {
-                    CGSize sizeValue = [(NSValue *)propertyValue CGSizeValue];
-                    setDicObjectBlock(NSStringFromCGSize(sizeValue), keyString);
-                } else if ([propertyClassString isEqualToString:[BAModelHelper rangeClassStr]]) {
-                    NSRange rangeValue = [(NSValue *)propertyValue rangeValue];
-                    setDicObjectBlock(NSStringFromRange(rangeValue), keyString);
+            
+            unsigned int propertyCount;
+            objc_property_t *propertyList = class_copyPropertyList(currentClass, &propertyCount);
+            for (int i=0; i<propertyCount; i++) {
+                objc_property_t propertyItem = propertyList[i];
+                NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
+                if ([ignoredProperties containsObject:propertyNameString]) {
+                    continue;
+                }
+                NSString *keyString = [self keyFromPropertyName:propertyNameString];
+                if (!keyString || keyString.length == 0) {
+                    continue;
+                }
+                NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:property_getAttributes(propertyItem)];
+                if (!propertyClassString || propertyClassString.length == 0) {
+                    continue;
+                }
+                id propertyValue = [object valueForKey:propertyNameString];
+                if ([BAModelHelper isObjectClass:propertyClassString]) {
+                    setDicObjectBlock([self codeObject:propertyValue], keyString);
+                } else {
+                    if ([propertyClassString isEqualToString:[BAModelHelper boolClassStr]]
+                        || [propertyClassString isEqualToString:[BAModelHelper intClassStr]]
+                        || [propertyClassString isEqualToString:[BAModelHelper unsignedIntClassStr]]
+                        || [propertyClassString isEqualToString:[BAModelHelper NSIntegerClassStr]]
+                        || [propertyClassString isEqualToString:[BAModelHelper NSUIntegerClassStr]]) {
+                        setDicObjectBlock(propertyValue, keyString);
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper floatClassStr]]) {
+                        setDicObjectBlock([NSString stringWithFormat:@"%.6f", ((NSNumber *)propertyValue).floatValue], keyString);
+                    }  else if ([propertyClassString isEqualToString:[BAModelHelper doubleClassStr]]) {
+                        setDicObjectBlock([NSString stringWithFormat:@"%.14f", ((NSNumber *)propertyValue).doubleValue], keyString);
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper rectClassStr]]) {
+                        CGRect rectValue = [(NSValue *)propertyValue CGRectValue];
+                        setDicObjectBlock(NSStringFromCGRect(rectValue), keyString);
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper pointClassStr]]) {
+                        CGPoint pointValue = [(NSValue *)propertyValue CGPointValue];
+                        setDicObjectBlock(NSStringFromCGPoint(pointValue), keyString);
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper sizeClassStr]]) {
+                        CGSize sizeValue = [(NSValue *)propertyValue CGSizeValue];
+                        setDicObjectBlock(NSStringFromCGSize(sizeValue), keyString);
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper rangeClassStr]]) {
+                        NSRange rangeValue = [(NSValue *)propertyValue rangeValue];
+                        setDicObjectBlock(NSStringFromRange(rangeValue), keyString);
+                    }
                 }
             }
+            
+            currentClass = [currentClass superclass];
         }
         return result;
     } else {

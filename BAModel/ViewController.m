@@ -81,46 +81,46 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-//    BATestModel0 *inner = [[BATestModel0 alloc] init];
-//    inner.string = @"innerStr";
-//
-//    BATestModel0 *inner2 = [[BATestModel0 alloc] init];
-//    inner2.string = @"innerStr";
-//
-//    BATestModel *test0 = [[BATestModel alloc] init];
-//    test0.inner = inner;
-//    test0.strArray = @[@"str1", @"str2"];
-//    test0.inners = @[inner2];
-//    test0.boolValue = YES;
-//    test0.str = @"stringTest";
-//    test0.intValue = 919;
-//    test0.rect = CGRectMake(0, 0, 12.3, 34);
-//    test0.point = CGPointMake(1, -9.234578);
-//    test0.floatValue = 999.123456789012345678901234567890123456789;
-//    test0.doubleValue = 999.123456789012345678901234567890123456789;
-//    test0.rangeValue = NSMakeRange(12, 34);
-//    test0.date = [NSDate date];
-//
-//    NSDictionary *objDic = [test0 toDictionary];
-//
-//    BATestModel *test1 = [[BATestModel alloc] initWithDictionary:objDic];
-//
-//    NSString *json = [test1 toJsonStr];
-//
-//    BATestModel *test2 = [[BATestModel alloc] initWithJsonStr:json];
-//
-//    NSArray *array = @[test0];
-//    NSDictionary *dic = @{@"testobj": test0};
-    
+    BATestModel0 *inner = [[BATestModel0 alloc] init];
+    inner.string = @"innerStr";
+
+    BATestModel0 *inner2 = [[BATestModel0 alloc] init];
+    inner2.string = @"innerStr";
+
+    BATestModel *test0 = [[BATestModel alloc] init];
+    test0.inner = inner;
+    test0.strArray = @[@"str1", @"str2"];
+    test0.inners = @[inner2];
+    test0.boolValue = YES;
+    test0.str = @"stringTest";
+    test0.intValue = 919;
+    test0.rect = CGRectMake(0, 0, 12.3, 34);
+    test0.point = CGPointMake(1, -9.234578);
+    test0.floatValue = 999.123456789012345678901234567890123456789;
+    test0.doubleValue = 999.123456789012345678901234567890123456789;
+    test0.rangeValue = NSMakeRange(12, 34);
+    test0.date = [NSDate date];
+
+    NSDictionary *objDic = [test0 toDictionary];
+
+    BATestModel *test1 = [[BATestModel alloc] initWithDictionary:objDic];
+
+    NSString *json = [test1 toJsonStr];
+
+    BATestModel *test2 = [[BATestModel alloc] initWithJsonStr:json];
+
+    NSString *json2 = [@[test0] bam_toJsonStr];
+    NSString *json3 = [@{@"testobj": test0} bam_toJsonStr];
+
     BATestSonModel *model = [[BATestSonModel alloc] init];
     model.fatherStr = @"testF";
     model.fatherIgStr = @"testIgF";
     model.sonStr = @"testS";
-     
+
     NSDictionary *objc = [model toDictionary];
-    
+
     BATestSonModel *newModel = [[BATestSonModel alloc] initWithDictionary:objc];
-    
+
     NSLog(@"");
 }
 

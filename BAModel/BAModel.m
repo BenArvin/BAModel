@@ -10,9 +10,58 @@
 #import <objc/runtime.h>
 
 @interface BAModelHelper : NSObject
+
+// usr/include/objc/runtime.h
+@property (nonatomic) NSString *intClassStr;//_C_INT
+@property (nonatomic) NSString *uintClassStr;//_C_UINT
+@property (nonatomic) NSString *longClassStr;//_C_LNG
+@property (nonatomic) NSString *ulongClassStr;//_C_ULNG
+@property (nonatomic) NSString *longlongClassStr;//_C_LNG_LNG
+@property (nonatomic) NSString *ulonglongClassStr;//_C_ULNG_LNG
+@property (nonatomic) NSString *floatClassStr;//_C_FLT
+@property (nonatomic) NSString *doubleClassStr;//_C_DBL
+@property (nonatomic) NSString *boolClassStr;//_C_BOOL
+@property (nonatomic) NSString *rectClassStr;
+@property (nonatomic) NSString *pointClassStr;
+@property (nonatomic) NSString *sizeClassStr;
+@property (nonatomic) NSString *rangeClassStr;
+
+@property (nonatomic) NSRegularExpression *objClassRegular;
+
 @end
 
 @implementation BAModelHelper
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _intClassStr = [NSString stringWithUTF8String:@encode(int)];
+        _uintClassStr = [NSString stringWithUTF8String:@encode(unsigned int)];
+        _longClassStr = [NSString stringWithUTF8String:@encode(long)];
+        _ulongClassStr = [NSString stringWithUTF8String:@encode(unsigned long)];
+        _longlongClassStr = [NSString stringWithUTF8String:@encode(long long)];
+        _ulonglongClassStr = [NSString stringWithUTF8String:@encode(unsigned long long)];
+        _floatClassStr = [NSString stringWithUTF8String:@encode(float)];
+        _doubleClassStr = [NSString stringWithUTF8String:@encode(double)];
+        _boolClassStr = [NSString stringWithUTF8String:@encode(bool)];
+        _rectClassStr = [NSString stringWithUTF8String:@encode(CGRect)];
+        _pointClassStr = [NSString stringWithUTF8String:@encode(CGPoint)];
+        _sizeClassStr = [NSString stringWithUTF8String:@encode(CGSize)];
+        _rangeClassStr = [NSString stringWithUTF8String:@encode(NSRange)];
+        
+        _objClassRegular = [NSRegularExpression regularExpressionWithPattern:@"^@\"(.)*\"$" options:0 error:nil];
+    }
+    return self;
+}
+
++ (instancetype)shared {
+    static dispatch_once_t onceToken;
+    static BAModelHelper *_shared;
+    dispatch_once(&onceToken, ^{
+        _shared = [[BAModelHelper alloc] init];
+    });
+    return _shared;
+}
 
 + (NSString *)dateToStr:(NSDate *)date {
     if (!date) {
@@ -29,115 +78,22 @@
 }
 
 + (BOOL)isObjectClass:(NSString *)classStr {
-    if (!classStr || classStr.length <= 4) {
+    if (!classStr || classStr.length < 3) {
         return NO;
     }
-    NSInteger resultsCount = [[self objClassRegular] numberOfMatchesInString:classStr options:0 range:NSMakeRange(0, classStr.length)];
-    return (resultsCount == 1);
+    if ([classStr rangeOfString:@"@\""].location == 0) {
+        return YES;
+    } else {
+        return NO;
+    }
 }
 
 + (Class)getObjectClass:(NSString *)classStr {
     if (![self isObjectClass:classStr]) {
         return nil;
     }
-    NSString *newClassStr = [classStr substringWithRange:NSMakeRange(3, classStr.length - 4)];
+    NSString *newClassStr = [classStr substringWithRange:NSMakeRange(2, classStr.length - 3)];
     return NSClassFromString(newClassStr);
-}
-
-+ (NSString *)rectClassStr {
-    return @"T{CGRect={CGPoint=dd}{CGSize=dd}}";
-}
-
-+ (NSString *)pointClassStr {
-    return @"T{CGPoint=dd}";
-}
-
-+ (NSString *)sizeClassStr {
-    return @"T{CGSize=dd}";
-}
-
-+ (NSString *)rangeClassStr {
-    return @"T{_NSRange=QQ}";
-}
-
-+ (NSString *)boolClassStr
-{
-    static NSString *classNameBOOL;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameBOOL = [NSString stringWithFormat:@"T%c", _C_BOOL];
-    });
-    return classNameBOOL;
-}
-
-+ (NSString *)intClassStr
-{
-    static NSString *classNameInt;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameInt = [NSString stringWithFormat:@"T%c", _C_INT];
-    });
-    return classNameInt;
-}
-
-+ (NSString *)unsignedIntClassStr
-{
-    static NSString *classNameUnsignedInt;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameUnsignedInt = [NSString stringWithFormat:@"T%c", _C_UINT];
-    });
-    return classNameUnsignedInt;
-}
-
-+ (NSString *)NSIntegerClassStr
-{
-    static NSString *classNameNSInteger;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameNSInteger = [NSString stringWithFormat:@"T%c", _C_LNG_LNG];
-    });
-    return classNameNSInteger;
-}
-
-+ (NSString *)NSUIntegerClassStr
-{
-    static NSString *classNameNSUInteger;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameNSUInteger = [NSString stringWithFormat:@"T%c", _C_ULNG_LNG];
-    });
-    return classNameNSUInteger;
-}
-
-+ (NSString *)floatClassStr
-{
-    static NSString *classNameFloat;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameFloat = [NSString stringWithFormat:@"T%c", _C_FLT];
-    });
-    return classNameFloat;
-}
-
-+ (NSString *)doubleClassStr
-{
-    static NSString *classNameDouble;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        classNameDouble = [NSString stringWithFormat:@"T%c", _C_DBL];
-    });
-    return classNameDouble;
-}
-
-#pragma mark - private methods
-+ (NSRegularExpression *)objClassRegular {
-    static dispatch_once_t onceToken;
-    static NSRegularExpression *_objClassRegular;
-    dispatch_once(&onceToken, ^{
-        _objClassRegular = [NSRegularExpression regularExpressionWithPattern:@"^T@\"(.)*\"$" options:0 error:nil];
-    });
-    return _objClassRegular;
 }
 
 @end
@@ -281,7 +237,7 @@
         for (int i=0; i<propertyCount; i++) {
             objc_property_t propertyItem = propertyList[i];
             NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
-            NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:property_getAttributes(propertyItem)];
+            NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:propertyItem];
             if (propertyNameString && propertyClassString) {
                 [propertyInfos setObject:propertyClassString forKey:propertyNameString];
             }
@@ -367,23 +323,30 @@
                 [self setValue:newVlaue forKey:propertyName];
             }
         } else {
-            if ([propertyClassName isEqualToString:[BAModelHelper boolClassStr]]
-                || [propertyClassName isEqualToString:[BAModelHelper intClassStr]]
-                || [propertyClassName isEqualToString:[BAModelHelper unsignedIntClassStr]]
-                || [propertyClassName isEqualToString:[BAModelHelper NSIntegerClassStr]]
-                || [propertyClassName isEqualToString:[BAModelHelper NSUIntegerClassStr]]) {
-                [self setValue:@(((NSString *)value).intValue) forKey:propertyName];
-            } else if ([propertyClassName isEqualToString:[BAModelHelper floatClassStr]]) {
-                [self setValue:@(((NSString *)value).floatValue) forKey:propertyName];
-            } else if ([propertyClassName isEqualToString:[BAModelHelper doubleClassStr]]) {
-                [self setValue:@(((NSString *)value).doubleValue) forKey:propertyName];
-            } else if ([propertyClassName isEqualToString:[BAModelHelper rectClassStr]]) {
+            if ([propertyClassName isEqualToString:[BAModelHelper shared].boolClassStr]
+                || [propertyClassName isEqualToString:[BAModelHelper shared].intClassStr]) {
+                [self setValue:@(((NSNumber *)value).intValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].uintClassStr]) {
+                [self setValue:@(((NSNumber *)value).unsignedIntValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].longClassStr]) {
+                [self setValue:@(((NSNumber *)value).longValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].ulongClassStr]) {
+                [self setValue:@(((NSNumber *)value).unsignedLongValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].longlongClassStr]) {
+                [self setValue:@(((NSNumber *)value).longLongValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].ulonglongClassStr]) {
+                [self setValue:@(((NSNumber *)value).unsignedLongLongValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].floatClassStr]) {
+                [self setValue:@(((NSNumber *)value).floatValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].doubleClassStr]) {
+                [self setValue:@(((NSNumber *)value).doubleValue) forKey:propertyName];
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].rectClassStr]) {
                 [self setValue:[NSValue valueWithCGRect:CGRectFromString(value)] forKey:propertyName];
-            } else if ([propertyClassName isEqualToString:[BAModelHelper pointClassStr]]) {
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].pointClassStr]) {
                 [self setValue:[NSValue valueWithCGPoint:CGPointFromString(value)] forKey:propertyName];
-            } else if ([propertyClassName isEqualToString:[BAModelHelper sizeClassStr]]) {
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].sizeClassStr]) {
                 [self setValue:[NSValue valueWithCGSize:CGSizeFromString(value)] forKey:propertyName];
-            } else if ([propertyClassName isEqualToString:[BAModelHelper rangeClassStr]]) {
+            } else if ([propertyClassName isEqualToString:[BAModelHelper shared].rangeClassStr]) {
                 [self setValue:[NSValue valueWithRange:NSRangeFromString(value)] forKey:propertyName];
             }
         }
@@ -424,13 +387,10 @@
     }
 }
 
-- (NSString *)propertyClassStringFromPropertyAttributes:(const char *)propertyAttributes
+- (NSString *)propertyClassStringFromPropertyAttributes:(objc_property_t)property
 {
-    NSString *propertyAttributesString = [NSString stringWithUTF8String:propertyAttributes];
-    if (!propertyAttributesString || propertyAttributesString.length == 0) {
-        return nil;
-    }
-    return [propertyAttributesString componentsSeparatedByString:@","].firstObject;
+    objc_property_attribute_t *list = property_copyAttributeList(property, nil);
+    return [NSString stringWithUTF8String:list[0].value];
 }
 
 - (id)decodeObject:(id)object withClass:(Class)objectClass innerClass:(Class)innerClass
@@ -524,7 +484,7 @@
                 if (!keyString || keyString.length == 0) {
                     continue;
                 }
-                NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:property_getAttributes(propertyItem)];
+                NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:propertyItem];
                 if (!propertyClassString || propertyClassString.length == 0) {
                     continue;
                 }
@@ -532,26 +492,26 @@
                 if ([BAModelHelper isObjectClass:propertyClassString]) {
                     setDicObjectBlock([self codeObject:propertyValue], keyString);
                 } else {
-                    if ([propertyClassString isEqualToString:[BAModelHelper boolClassStr]]
-                        || [propertyClassString isEqualToString:[BAModelHelper intClassStr]]
-                        || [propertyClassString isEqualToString:[BAModelHelper unsignedIntClassStr]]
-                        || [propertyClassString isEqualToString:[BAModelHelper NSIntegerClassStr]]
-                        || [propertyClassString isEqualToString:[BAModelHelper NSUIntegerClassStr]]) {
+                    if ([propertyClassString isEqualToString:[BAModelHelper shared].boolClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].intClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].uintClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].longClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].ulongClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].longlongClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].ulonglongClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].floatClassStr]
+                        || [propertyClassString isEqualToString:[BAModelHelper shared].doubleClassStr]) {
                         setDicObjectBlock(propertyValue, keyString);
-                    } else if ([propertyClassString isEqualToString:[BAModelHelper floatClassStr]]) {
-                        setDicObjectBlock([NSString stringWithFormat:@"%.6f", ((NSNumber *)propertyValue).floatValue], keyString);
-                    }  else if ([propertyClassString isEqualToString:[BAModelHelper doubleClassStr]]) {
-                        setDicObjectBlock([NSString stringWithFormat:@"%.14f", ((NSNumber *)propertyValue).doubleValue], keyString);
-                    } else if ([propertyClassString isEqualToString:[BAModelHelper rectClassStr]]) {
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper shared].rectClassStr]) {
                         CGRect rectValue = [(NSValue *)propertyValue CGRectValue];
                         setDicObjectBlock(NSStringFromCGRect(rectValue), keyString);
-                    } else if ([propertyClassString isEqualToString:[BAModelHelper pointClassStr]]) {
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper shared].pointClassStr]) {
                         CGPoint pointValue = [(NSValue *)propertyValue CGPointValue];
                         setDicObjectBlock(NSStringFromCGPoint(pointValue), keyString);
-                    } else if ([propertyClassString isEqualToString:[BAModelHelper sizeClassStr]]) {
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper shared].sizeClassStr]) {
                         CGSize sizeValue = [(NSValue *)propertyValue CGSizeValue];
                         setDicObjectBlock(NSStringFromCGSize(sizeValue), keyString);
-                    } else if ([propertyClassString isEqualToString:[BAModelHelper rangeClassStr]]) {
+                    } else if ([propertyClassString isEqualToString:[BAModelHelper shared].rangeClassStr]) {
                         NSRange rangeValue = [(NSValue *)propertyValue rangeValue];
                         setDicObjectBlock(NSStringFromRange(rangeValue), keyString);
                     }

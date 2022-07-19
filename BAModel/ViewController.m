@@ -9,7 +9,7 @@
 #import "ViewController.h"
 #import "BAModel.h"
 
-@interface BATestModel0 : BAModel
+@interface BATestModel0 : NSObject
 
 @property (nonatomic) NSString *string;
 
@@ -19,7 +19,7 @@
 
 @end
 
-@interface BATestModel : BAModel
+@interface BATestModel : NSObject
 
 @property (nonatomic) NSArray <BATestModel0 *> *inners;
 @property (nonatomic) NSArray <NSString *> *strArray;
@@ -36,7 +36,7 @@
 
 @end
 
-@interface BATestFatherModel : BAModel
+@interface BATestFatherModel : NSObject
 
 @property (nonatomic) NSString *fatherStr;
 @property (nonatomic) NSString *fatherIgStr;
@@ -51,7 +51,7 @@
 
 @implementation BATestFatherModel
 
-- (NSArray *)ignoredProperties {
+- (NSArray *)bam_ignoredProperties {
     return @[@"fatherIgStr"];
 }
 
@@ -62,11 +62,11 @@
 
 @implementation BATestModel
 
-//- (NSArray *)ignoredProperties {
-//    return @[@"key1"];
-//}
+- (NSArray *)bam_ignoredProperties {
+    return @[@"key1"];
+}
 
-- (NSDictionary <NSString *, Class> *)containerPropertyGenericClass {
+- (NSDictionary <NSString *, Class> *)bam_containerPropertyGenericClass {
     return @{@"inners": [BATestModel0 class]};
 }
 
@@ -101,13 +101,15 @@
     test0.rangeValue = NSMakeRange(12, 34);
     test0.date = [NSDate date];
 
-    NSDictionary *objDic = [test0 toDictionary];
+    NSDictionary *objDic = [test0 bam_toDictionary];
 
-    BATestModel *test1 = [[BATestModel alloc] initWithDictionary:objDic];
+    BATestModel *test1 = [[BATestModel alloc] bam_initWithDictionary:objDic];
+    
+    NSLog(@"");
 
-    NSString *json = [test1 toJsonStr];
+    NSString *json = [test1 bam_toJsonStr];
 
-    BATestModel *test2 = [[BATestModel alloc] initWithJsonStr:json];
+    BATestModel *test2 = [[BATestModel alloc] bam_initWithJsonStr:json];
 
     NSString *json2 = [@[test0] bam_toJsonStr];
     NSString *json3 = [@{@"testobj": test0} bam_toJsonStr];
@@ -117,10 +119,10 @@
     model.fatherIgStr = @"testIgF";
     model.sonStr = @"testS";
 
-    NSDictionary *objc = [model toDictionary];
+    NSDictionary *objc = [model bam_toDictionary];
 
-    BATestSonModel *newModel = [[BATestSonModel alloc] initWithDictionary:objc];
-
+    BATestSonModel *newModel = [[BATestSonModel alloc] bam_initWithDictionary:objc];
+    
     NSLog(@"");
 }
 

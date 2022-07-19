@@ -3,11 +3,12 @@
 //  BAModel
 //
 //  Created by BenArvin on 2019/4/11.
-//  Copyright © 2019 BenArvin. All rights reserved.
+//  Copyright © 2019 Tencent. All rights reserved.
 //
 
 #import "BAModel.h"
 #import <objc/runtime.h>
+#import <CoreGraphics/CoreGraphics.h>
 
 @interface BAModelHelper : NSObject
 
@@ -26,8 +27,6 @@
 @property (nonatomic) NSString *sizeClassStr;
 @property (nonatomic) NSString *rangeClassStr;
 
-@property (nonatomic) NSRegularExpression *objClassRegular;
-
 @end
 
 @implementation BAModelHelper
@@ -44,23 +43,22 @@
         _floatClassStr = [NSString stringWithUTF8String:@encode(float)];
         _doubleClassStr = [NSString stringWithUTF8String:@encode(double)];
         _boolClassStr = [NSString stringWithUTF8String:@encode(bool)];
+
         _rectClassStr = [NSString stringWithUTF8String:@encode(CGRect)];
         _pointClassStr = [NSString stringWithUTF8String:@encode(CGPoint)];
         _sizeClassStr = [NSString stringWithUTF8String:@encode(CGSize)];
         _rangeClassStr = [NSString stringWithUTF8String:@encode(NSRange)];
-        
-        _objClassRegular = [NSRegularExpression regularExpressionWithPattern:@"^@\"(.)*\"$" options:0 error:nil];
     }
     return self;
 }
 
 + (instancetype)shared {
     static dispatch_once_t onceToken;
-    static BAModelHelper *_shared;
+    static BAModelHelper *helper;
     dispatch_once(&onceToken, ^{
-        _shared = [[BAModelHelper alloc] init];
+        helper = [[BAModelHelper alloc] init];
     });
-    return _shared;
+    return helper;
 }
 
 + (NSString *)dateToStr:(NSDate *)date {
@@ -101,100 +99,35 @@
 
 @implementation NSObject (BAModel)
 
-- (NSString *)bam_toJsonStr {
-    if ([self isKindOfClass:[BAModel class]]) {
-        return [((BAModel *)self) toJsonStr];
-    } else if ([self isKindOfClass:[NSArray class]] || [self isKindOfClass:[NSDictionary class]]) {
-        id newObj = [self bam_toBaseObject];
-        if (!newObj) {
-            return nil;
-        }
-        NSError *error = nil;
-        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:newObj options:0 error:&error];
-        if (error || !jsonData) {
-            return nil;
-        }
-        return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+- (instancetype)bam_initWithDictionary:(NSDictionary *)dictionary {
+    id result = [self init];
+    if (result) {
+        [result bam_loadFromDic:dictionary];
     }
-    return nil;
+    return result;
 }
 
-// array, dic, string, data, number
-- (id)bam_toBaseObject {
-    if ([self isKindOfClass:[BAModel class]]) {
-        return [((BAModel *)self) toDictionary];
-    } else if ([self isKindOfClass:[NSArray class]]) {
-        NSMutableArray *result = [[NSMutableArray alloc] init];
-        for (id item in (NSArray *)self) {
-            id newItem = [item bam_toBaseObject];
-            if (newItem) {
-                [result addObject:newItem];
-            }
-        }
-        return result;
-    } else if ([self isKindOfClass:[NSDictionary class]]) {
-        NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
-        NSEnumerator *enumerator = [((NSDictionary *)self) keyEnumerator];
-        id key;
-        while ((key = [enumerator nextObject])) {
-            if (![key isKindOfClass:[NSString class]]) {
-                continue;
-            }
-            id value = [((NSDictionary *)self) valueForKey:key];
-            id newValue = [value bam_toBaseObject];
-            if (newValue) {
-                [result setObject:newValue forKey:key];
-            }
-        }
-        return result;
-    } else if ([self isKindOfClass:[NSNumber class]]) {
-        return self;
-    } else if ([self isKindOfClass:[NSData class]]) {
-        return self;
-    } else if ([self isKindOfClass:[NSString class]]) {
-        return self;
-    } else if ([self isKindOfClass:[NSDate class]]) {
-        return [BAModelHelper dateToStr:(NSDate *)self];
-    }
-    return nil;
+- (NSDictionary *)bam_toDictionary {
+    return [self bam_codeObject];
 }
 
-@end
-
-@implementation BAModel
-
-#pragma mark - public methods
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary
-{
-    self = [super init];
-    if (self) {
-        [self loadFromDic:dictionary];
-    }
-    return self;
-}
-
-- (NSDictionary *)toDictionary
-{
-    return [self codeObject:self];
-}
-
-- (instancetype)initWithJsonStr:(NSString *)jsonStr {
-    self = [super init];
-    if (self) {
+- (instancetype)bam_initWithJsonStr:(NSString *)jsonStr {
+    id result = [self init];
+    if (result) {
         NSData *jsonData = [jsonStr dataUsingEncoding:NSUTF8StringEncoding];
         if (jsonData) {
             NSError *err;
             NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&err];
             if (!err && dic) {
-                [self loadFromDic:dic];
+                [self bam_loadFromDic:dic];
             }
         }
     }
-    return self;
+    return result;
 }
 
-- (NSString *)toJsonStr {
-    NSDictionary *dic = [self toDictionary];
+- (NSString *)bam_toJsonStr {
+    NSDictionary *dic = [self bam_codeObject];
     if (!dic) {
         return nil;
     }
@@ -206,30 +139,16 @@
     return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
 }
 
-- (NSArray <NSString *> *)ignoredProperties
-{
-    return nil;
-}
-
-- (NSDictionary *)customPropertyNames
-{
-    return nil;
-}
-
-- (NSDictionary <NSString *, Class> *)containerPropertyGenericClass {
-    return nil;
-}
-
-#pragma mark - private method
-- (void)loadFromDic:(NSDictionary *)dic {
-    if (!dic) {
+#pragma mark - private methods
+- (void)bam_loadFromDic:(NSDictionary *)dic {
+    if (!dic || [self class] == [NSObject class]) {
         return;
     }
-    
+
     NSMutableDictionary *propertyInfos = [[NSMutableDictionary alloc] init];
     Class currentClass = [self class];
     while (1) {
-        if (currentClass == [BAModel class]) {
+        if (currentClass == [NSObject class]) {
             break;
         }
         unsigned int propertyCount;
@@ -237,29 +156,35 @@
         for (int i=0; i<propertyCount; i++) {
             objc_property_t propertyItem = propertyList[i];
             NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
-            NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:propertyItem];
+            NSString *propertyClassString = [self bam_propertyClassStringFromPropertyAttributes:propertyItem];
             if (propertyNameString && propertyClassString) {
                 [propertyInfos setObject:propertyClassString forKey:propertyNameString];
             }
         }
         currentClass = [currentClass superclass];
     }
-    
-    NSArray *ignoredProperties = [self ignoredProperties];
-    NSDictionary *genericClasses = [self containerPropertyGenericClass];
-    
+
+    NSArray *ignoredProperties = nil;
+    if ([self respondsToSelector:@selector(bam_ignoredProperties)]) {
+        ignoredProperties = [self performSelector:@selector(bam_ignoredProperties)];
+    }
+    NSDictionary *genericClasses = nil;
+    if ([self respondsToSelector:@selector(bam_containerPropertyGenericClass)]) {
+        genericClasses = [self performSelector:@selector(bam_containerPropertyGenericClass)];
+    }
+
     NSEnumerator *enumerator = [dic keyEnumerator];
     id key;
     while ((key = [enumerator nextObject])) {
         if (![key isKindOfClass:[NSString class]]) {
             continue;
         }
-        NSString *propertyName = [self propertyNameFromKey:key];
+        NSString *propertyName = [self bam_propertyNameFromKey:key];
         if (!propertyName || propertyName.length == 0 || [ignoredProperties containsObject:propertyName]) {
             continue;
         }
         id value = [dic valueForKey:key];
-        
+
         NSString *propertyClassName = [propertyInfos objectForKey:propertyName];
         if (!propertyClassName || propertyClassName.length == 0) {
             continue;
@@ -284,20 +209,21 @@
                 [self setValue:[NSDate dateWithTimeIntervalSince1970:((NSString *)value).doubleValue] forKey:propertyName];
             } else if ([propertyClass isSubclassOfClass:[NSArray class]]) {
                 Class genericClass = [genericClasses objectForKey:propertyName];
+                if (!genericClass || ![genericClass isKindOfClass:[NSObject class]]) {
+                    [self setValue:value forKey:propertyName];
+                    continue;
+                }
                 NSMutableArray *newValue = [[NSMutableArray alloc] init];
                 for (id item in (NSArray *)value) {
-                    if (genericClass && [genericClass isSubclassOfClass:[BAModel class]]) {
-                        id newItem = [[genericClass alloc] init];
-                        [(BAModel *)newItem loadFromDic:item];
-                        [newValue addObject:newItem];
-                    } else {
-                        [newValue addObject:item];
-                    }
+                    id newItem = [[genericClass alloc] init];
+                    [newItem bam_loadFromDic:item];
+                    [newValue addObject:newItem];
                 }
                 [self setValue:newValue forKey:propertyName];
             } else if ([propertyClass isSubclassOfClass:[NSDictionary class]]) {
                 Class genericClass = [genericClasses objectForKey:propertyName];
-                if (!genericClass || ![genericClass isSubclassOfClass:[BAModel class]]) {
+                if (!genericClass || ![genericClass isKindOfClass:[NSObject class]]) {
+                    [self setValue:value forKey:propertyName];
                     continue;
                 }
                 NSMutableDictionary *newValue = [[NSMutableDictionary alloc] init];
@@ -308,18 +234,14 @@
                         continue;
                     }
                     id oldItem = [(NSDictionary *)value objectForKey:innerKey];
-                    if (genericClass && [genericClass isSubclassOfClass:[BAModel class]]) {
-                        id newItem = [[genericClass alloc] init];
-                        [(BAModel *)newItem loadFromDic:oldItem];
-                        [newValue setValue:innerKey forKey:newItem];
-                    } else {
-                        [newValue setValue:innerKey forKey:oldItem];
-                    }
+                    id newItem = [[genericClass alloc] init];
+                    [newItem bam_loadFromDic:oldItem];
+                    [newValue setValue:innerKey forKey:newItem];
                 }
                 [self setValue:newValue forKey:propertyName];
-            } else if ([propertyClass isSubclassOfClass:[BAModel class]]) {
+            } else if ([propertyClass isKindOfClass:[NSObject class]]) {
                 id newVlaue = [[propertyClass alloc] init];
-                [(BAModel *)newVlaue loadFromDic:value];
+                [newVlaue bam_loadFromDic:value];
                 [self setValue:newVlaue forKey:propertyName];
             }
         } else {
@@ -341,109 +263,59 @@
             } else if ([propertyClassName isEqualToString:[BAModelHelper shared].doubleClassStr]) {
                 [self setValue:@(((NSNumber *)value).doubleValue) forKey:propertyName];
             } else if ([propertyClassName isEqualToString:[BAModelHelper shared].rectClassStr]) {
-                [self setValue:[NSValue valueWithCGRect:CGRectFromString(value)] forKey:propertyName];
+                CGRect rectValue = [self bam_strToRect:value];
+                SEL sel = NSSelectorFromString([self bam_setSelNameFromGetSelName:propertyName]);
+                void *params[1] = {&rectValue};
+                [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:sel paramsCount:1 params:params result:nil];
             } else if ([propertyClassName isEqualToString:[BAModelHelper shared].pointClassStr]) {
-                [self setValue:[NSValue valueWithCGPoint:CGPointFromString(value)] forKey:propertyName];
+                CGPoint pointValue = [self bam_strToPoint:value];
+                SEL sel = NSSelectorFromString([self bam_setSelNameFromGetSelName:propertyName]);
+                void *params[1] = {&pointValue};
+                [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:sel paramsCount:1 params:params result:nil];
             } else if ([propertyClassName isEqualToString:[BAModelHelper shared].sizeClassStr]) {
-                [self setValue:[NSValue valueWithCGSize:CGSizeFromString(value)] forKey:propertyName];
+                CGSize sizeValue = [self bam_strToSize:value];
+                SEL sel = NSSelectorFromString([self bam_setSelNameFromGetSelName:propertyName]);
+                void *params[1] = {&sizeValue};
+                [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:sel paramsCount:1 params:params result:nil];
             } else if ([propertyClassName isEqualToString:[BAModelHelper shared].rangeClassStr]) {
-                [self setValue:[NSValue valueWithRange:NSRangeFromString(value)] forKey:propertyName];
+                NSRange rangeValue = [self bam_strToRange:value];
+                SEL sel = NSSelectorFromString([self bam_setSelNameFromGetSelName:propertyName]);
+                void *params[1] = {&rangeValue};
+                [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:sel paramsCount:1 params:params result:nil];
             }
         }
     }
 }
 
-- (NSString *)propertyNameFromKey:(NSString *)key
-{
-    if (!key || key.length == 0) {
+- (id)bam_codeObject {
+    if ([self class] == [NSObject class]) {
         return nil;
     }
-    NSDictionary *nameKeyDictionary = [self customPropertyNames];
-    if (!nameKeyDictionary) {
-        return key;
-    }
-    for (NSString *propertyName in nameKeyDictionary) {
-        if ([[nameKeyDictionary objectForKey:propertyName] isEqualToString:key]) {
-            return propertyName;
-        }
-    }
-    return key;
-}
-
-- (NSString *)keyFromPropertyName:(NSString *)propertyName
-{
-    if (!propertyName || propertyName.length == 0) {
-        return nil;
-    }
-    NSDictionary *nameKeyDictionary = [self customPropertyNames];
-    if (!nameKeyDictionary) {
-        return propertyName;
-    }
-    NSString *key = [nameKeyDictionary objectForKey:propertyName];
-    if (!key || key.length == 0) {
-        return propertyName;
-    } else {
-        return key;
-    }
-}
-
-- (NSString *)propertyClassStringFromPropertyAttributes:(objc_property_t)property
-{
-    objc_property_attribute_t *list = property_copyAttributeList(property, nil);
-    return [NSString stringWithUTF8String:list[0].value];
-}
-
-- (id)decodeObject:(id)object withClass:(Class)objectClass innerClass:(Class)innerClass
-{
-    if ([objectClass isSubclassOfClass:[BAModel class]]) {
-        return [[objectClass alloc] initWithDictionary:object];
-    } else if ([objectClass isSubclassOfClass:[NSArray class]]) {
-        if (innerClass) {
-            NSMutableArray *result = nil;
-            for (id arraryItem in (NSArray *)object) {
-                if (!result) {
-                    result = [[NSMutableArray alloc] init];
-                }
-                [result addObject:[[innerClass alloc] initWithDictionary:arraryItem]];
-            }
-            return result;
-        } else {
-            return object;
-        }
-    } else if ([objectClass isSubclassOfClass:[NSDictionary class]]) {
-        return object;
-    } else {
-        return object;
-    }
-}
-
-- (id)codeObject:(id)object
-{
-    if ([object isKindOfClass:[NSString class]]
-        || [object isKindOfClass:[NSData class]]
-        || [object isKindOfClass:[NSNumber class]]) {
-        return object;
-    } else if ([object isKindOfClass:[NSDate class]]) {
-        return [BAModelHelper dateToStr:(NSDate *)object];
-    } else if ([object isKindOfClass:[NSArray class]]) {
+    if ([self isKindOfClass:[NSString class]]
+        || [self isKindOfClass:[NSData class]]
+        || [self isKindOfClass:[NSNumber class]]) {
+        return self;
+    } else if ([self isKindOfClass:[NSDate class]]) {
+        return [BAModelHelper dateToStr:(NSDate *)self];
+    } else if ([self isKindOfClass:[NSArray class]]) {
         NSMutableArray *result = nil;
-        for (id arrayItem in (NSArray *)object) {
+        for (id arrayItem in (NSArray *)self) {
             if (!result) {
                 result = [[NSMutableArray alloc] init];
             }
-            id convertedItem = [self codeObject:arrayItem];
+            id convertedItem = [arrayItem bam_codeObject];
             if (convertedItem) {
                 [result addObject:convertedItem];
             }
         }
         return result;
-    } else if ([object isKindOfClass:[NSDictionary class]]) {
+    } else if ([self isKindOfClass:[NSDictionary class]]) {
         NSMutableDictionary *result = nil;
-        NSDictionary *dictionary = (NSDictionary *)object;
+        NSDictionary *dictionary = (NSDictionary *)self;
         for (id keyItem in [dictionary allKeys]) {
             id valueItem = [dictionary objectForKey:keyItem];
-            id convertedKey = [self codeObject:keyItem];
-            id convertedValue = [self codeObject:valueItem];
+            id convertedKey = [keyItem bam_codeObject];
+            id convertedValue = [valueItem bam_codeObject];
             if (!convertedKey || !convertedValue) {
                 continue;
             }
@@ -453,7 +325,7 @@
             [result setObject:convertedValue forKey:convertedKey];
         }
         return result;
-    } else if ([object isKindOfClass:[BAModel class]]) {
+    } else {
         __block NSMutableDictionary *result = nil;
         
         void(^setDicObjectBlock)(id, id) = ^(id value, id key) {
@@ -465,10 +337,13 @@
             }
             [result setObject:value forKey:key];
         };
-        NSArray *ignoredProperties = [self ignoredProperties];
-        Class currentClass = [object class];
+        NSArray *ignoredProperties = nil;
+        if ([self respondsToSelector:@selector(bam_ignoredProperties)]) {
+            ignoredProperties = [self performSelector:@selector(bam_ignoredProperties)];
+        }
+        Class currentClass = [self class];
         while (1) {
-            if (currentClass == [BAModel class]) {
+            if (currentClass == [NSObject class]) {
                 break;
             }
             
@@ -480,17 +355,17 @@
                 if ([ignoredProperties containsObject:propertyNameString]) {
                     continue;
                 }
-                NSString *keyString = [self keyFromPropertyName:propertyNameString];
+                NSString *keyString = [self bam_keyFromPropertyName:propertyNameString];
                 if (!keyString || keyString.length == 0) {
                     continue;
                 }
-                NSString *propertyClassString = [self propertyClassStringFromPropertyAttributes:propertyItem];
+                NSString *propertyClassString = [self bam_propertyClassStringFromPropertyAttributes:propertyItem];
                 if (!propertyClassString || propertyClassString.length == 0) {
                     continue;
                 }
-                id propertyValue = [object valueForKey:propertyNameString];
+                id propertyValue = [self valueForKey:propertyNameString];
                 if ([BAModelHelper isObjectClass:propertyClassString]) {
-                    setDicObjectBlock([self codeObject:propertyValue], keyString);
+                    setDicObjectBlock([propertyValue bam_codeObject], keyString);
                 } else {
                     if ([propertyClassString isEqualToString:[BAModelHelper shared].boolClassStr]
                         || [propertyClassString isEqualToString:[BAModelHelper shared].intClassStr]
@@ -503,17 +378,21 @@
                         || [propertyClassString isEqualToString:[BAModelHelper shared].doubleClassStr]) {
                         setDicObjectBlock(propertyValue, keyString);
                     } else if ([propertyClassString isEqualToString:[BAModelHelper shared].rectClassStr]) {
-                        CGRect rectValue = [(NSValue *)propertyValue CGRectValue];
-                        setDicObjectBlock(NSStringFromCGRect(rectValue), keyString);
+                        CGRect rectValue;
+                        [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:NSSelectorFromString(propertyNameString) paramsCount:0 params:nil result:&rectValue];
+                        setDicObjectBlock([self bam_rectToStr:rectValue], keyString);
                     } else if ([propertyClassString isEqualToString:[BAModelHelper shared].pointClassStr]) {
-                        CGPoint pointValue = [(NSValue *)propertyValue CGPointValue];
-                        setDicObjectBlock(NSStringFromCGPoint(pointValue), keyString);
+                        CGPoint pointValue;
+                        [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:NSSelectorFromString(propertyNameString) paramsCount:0 params:nil result:&pointValue];
+                        setDicObjectBlock([self bam_pointToStr:pointValue], keyString);
                     } else if ([propertyClassString isEqualToString:[BAModelHelper shared].sizeClassStr]) {
-                        CGSize sizeValue = [(NSValue *)propertyValue CGSizeValue];
-                        setDicObjectBlock(NSStringFromCGSize(sizeValue), keyString);
+                        CGSize sizeValue;
+                        [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:NSSelectorFromString(propertyNameString) paramsCount:0 params:nil result:&sizeValue];
+                        setDicObjectBlock([self bam_sizeToStr:sizeValue], keyString);
                     } else if ([propertyClassString isEqualToString:[BAModelHelper shared].rangeClassStr]) {
-                        NSRange rangeValue = [(NSValue *)propertyValue rangeValue];
-                        setDicObjectBlock(NSStringFromRange(rangeValue), keyString);
+                        NSRange rangeValue;
+                        [self bam_callFuncDynamic:false targetClass:[self class] targetInstance:self selector:NSSelectorFromString(propertyNameString) paramsCount:0 params:nil result:&rangeValue];
+                        setDicObjectBlock([self bam_rangeToStr:rangeValue], keyString);
                     }
                 }
             }
@@ -521,9 +400,152 @@
             currentClass = [currentClass superclass];
         }
         return result;
-    } else {
+    }
+}
+
+- (NSString *)bam_propertyNameFromKey:(NSString *)key {
+    if (!key || key.length == 0) {
         return nil;
     }
+    NSDictionary *nameKeyDictionary = nil;
+    if ([self respondsToSelector:@selector(bam_customPropertyNames)]) {
+        nameKeyDictionary = [self performSelector:@selector(bam_customPropertyNames)];
+    }
+    if (!nameKeyDictionary) {
+        return key;
+    }
+    for (NSString *propertyName in nameKeyDictionary) {
+        if ([[nameKeyDictionary objectForKey:propertyName] isEqualToString:key]) {
+            return propertyName;
+        }
+    }
+    return key;
+}
+
+- (NSString *)bam_keyFromPropertyName:(NSString *)propertyName {
+    if (!propertyName || propertyName.length == 0) {
+        return nil;
+    }
+    NSDictionary *nameKeyDictionary = nil;
+    if ([self respondsToSelector:@selector(bam_customPropertyNames)]) {
+        nameKeyDictionary = [self performSelector:@selector(bam_customPropertyNames)];
+    }
+    if (!nameKeyDictionary) {
+        return propertyName;
+    }
+    NSString *key = [nameKeyDictionary objectForKey:propertyName];
+    if (!key || key.length == 0) {
+        return propertyName;
+    } else {
+        return key;
+    }
+}
+
+- (NSString *)bam_propertyClassStringFromPropertyAttributes:(objc_property_t)property {
+    objc_property_attribute_t *list = property_copyAttributeList(property, nil);
+    return [NSString stringWithUTF8String:list[0].value];
+}
+
+- (void)bam_callFuncDynamic:(bool)classFunc targetClass:(Class)targetClass targetInstance:(id)targetInstance selector:(SEL)selector paramsCount:(int)paramsCount params:(void *[])params result:(void *)result {
+    Class realTargetClass = targetClass;
+    id realTargetInstance = targetInstance;
+    if (classFunc) {
+        realTargetClass = objc_getMetaClass([NSStringFromClass(targetClass) UTF8String]);
+        realTargetInstance = targetClass;
+    }
+    NSMethodSignature *sig = [realTargetClass instanceMethodSignatureForSelector:selector];
+    if (!sig) {
+        return;
+    }
+    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:sig];
+    if (!invocation) {
+        return;
+    }
+    invocation.target = realTargetInstance;
+    invocation.selector = selector;
+    
+    for (int i=0; i<paramsCount; i++) {
+        void *tmpParamItem = params[i];
+        [invocation setArgument:tmpParamItem atIndex:(i+2)];
+    }
+    
+    [invocation invoke];
+    
+//    const char *sigretun = sig.methodReturnType;
+    NSUInteger siglength = sig.methodReturnLength;
+    if (siglength != 0) {
+//        if (strcmp(sigretun, "@") == 0) {
+//            NSString *returnStr;
+//            [invocation getReturnValue:&returnStr];
+//        }
+        if (result) {
+            [invocation getReturnValue:result];
+        }
+    }
+}
+
+- (NSString *)bam_rectToStr:(CGRect)rect {
+    return [[NSString alloc] initWithFormat:@"%f,%f,%f,%f", rect.origin.x, rect.origin.y, rect.size.width, rect.size.height];
+}
+
+- (CGRect)bam_strToRect:(NSString *)str {
+    if (![str isKindOfClass:[NSString class]]) {
+        return CGRectMake(0, 0, 0, 0);
+    }
+    NSArray <NSString *> *parts = [str componentsSeparatedByString:@","];
+    if (parts.count != 4) {
+        return CGRectMake(0, 0, 0, 0);
+    }
+    return CGRectMake(parts[0].floatValue, parts[1].floatValue, parts[2].floatValue, parts[3].floatValue);
+}
+
+- (NSString *)bam_pointToStr:(CGPoint)point {
+    return [[NSString alloc] initWithFormat:@"%f,%f", point.x, point.y];
+}
+
+- (CGPoint)bam_strToPoint:(NSString *)str {
+    if (![str isKindOfClass:[NSString class]]) {
+        return CGPointMake(0, 0);
+    }
+    NSArray <NSString *> *parts = [str componentsSeparatedByString:@","];
+    if (parts.count != 2) {
+        return CGPointMake(0, 0);
+    }
+    return CGPointMake(parts[0].floatValue, parts[1].floatValue);
+}
+
+- (NSString *)bam_sizeToStr:(CGSize)size {
+    return [[NSString alloc] initWithFormat:@"%f,%f", size.width, size.height];
+}
+
+- (CGSize)bam_strToSize:(NSString *)str {
+    if (![str isKindOfClass:[NSString class]]) {
+        return CGSizeMake(0, 0);
+    }
+    NSArray <NSString *> *parts = [str componentsSeparatedByString:@","];
+    if (parts.count != 2) {
+        return CGSizeMake(0, 0);
+    }
+    return CGSizeMake(parts[0].floatValue, parts[1].floatValue);
+}
+
+- (NSString *)bam_rangeToStr:(NSRange)range {
+    return [[NSString alloc] initWithFormat:@"%ld,%ld", range.location, range.length];
+}
+
+- (NSRange)bam_strToRange:(NSString *)str {
+    if (![str isKindOfClass:[NSString class]]) {
+        return NSMakeRange(0, 0);
+    }
+    NSArray <NSString *> *parts = [str componentsSeparatedByString:@","];
+    if (parts.count != 2) {
+        return NSMakeRange(0, 0);
+    }
+    return NSMakeRange(parts[0].integerValue, parts[1].integerValue);
+}
+
+- (NSString *)bam_setSelNameFromGetSelName:(NSString *)getSelName {
+    return [[NSString alloc] initWithFormat:@"set%@%@:", [getSelName substringToIndex:1].uppercaseString, [getSelName substringFromIndex:1]];
 }
 
 @end

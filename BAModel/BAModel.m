@@ -27,6 +27,8 @@
 @property (nonatomic) NSString *sizeClassStr;
 @property (nonatomic) NSString *rangeClassStr;
 
+@property (nonatomic) NSArray *defaultIgnoredProperties;
+
 @end
 
 @implementation BAModelHelper
@@ -48,6 +50,12 @@
         _pointClassStr = [NSString stringWithUTF8String:@encode(CGPoint)];
         _sizeClassStr = [NSString stringWithUTF8String:@encode(CGSize)];
         _rangeClassStr = [NSString stringWithUTF8String:@encode(NSRange)];
+        
+        _defaultIgnoredProperties = @[
+            NSStringFromSelector(@selector(hash)),
+            NSStringFromSelector(@selector(description)),
+            NSStringFromSelector(@selector(debugDescription)),
+        ];
     }
     return self;
 }
@@ -352,6 +360,9 @@
             for (int i=0; i<propertyCount; i++) {
                 objc_property_t propertyItem = propertyList[i];
                 NSString *propertyNameString = [NSString stringWithUTF8String:property_getName(propertyItem)];
+                if ([[BAModelHelper shared].defaultIgnoredProperties containsObject:propertyNameString]) {
+                    continue;
+                }
                 if ([ignoredProperties containsObject:propertyNameString]) {
                     continue;
                 }

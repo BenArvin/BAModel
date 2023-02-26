@@ -1,0 +1,6 @@
+framework module BAModel {
+  umbrella header "BAModel-umbrella.h"
+
+  export *
+  module * { export * }
+}

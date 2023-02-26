@@ -1,0 +1,13 @@
+use_frameworks!
+
+platform :ios, '10.0'
+
+target 'BAModel_Example' do
+  pod 'BAModel', :path => '../'
+
+  target 'BAModel_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end

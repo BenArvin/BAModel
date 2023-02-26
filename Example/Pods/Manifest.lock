@@ -1,0 +1,16 @@
+PODS:
+  - BAModel (0.1.0)
+
+DEPENDENCIES:
+  - BAModel (from `../`)
+
+EXTERNAL SOURCES:
+  BAModel:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  BAModel: cf8454083abff7e81bf777ba69ada693604d05a3
+
+PODFILE CHECKSUM: 40bea9655e0e5bf69df47e3b38422278eca41567
+
+COCOAPODS: 1.11.3
